@@ -1,170 +1,138 @@
 import mysql.connector
 from mysql.connector import Error
 
-# Function to create a MySQL database and table
-
 class Manage_DB:
     def __init__(self):
-        pass
+        # Dictionary to map keys to data types
+        self.data_type_mapping = {
+            'Sender': 'VARCHAR(255)',
+            'PAO_Code': 'VARCHAR(255)',
+            'Entity_Name': 'VARCHAR(255)',
+            'Ministry_Department': 'VARCHAR(255)',
+            'Sender_Name': 'VARCHAR(255)',
+            'Central_Govt_State_Govt': 'VARCHAR(255)',
+            'Focal_point_with_official_designation': 'VARCHAR(255)',
+            'Full_office_Address_wih_pin_code': 'VARCHAR(255)',
+            'Full_address_of_Focal_point': 'VARCHAR(255)',
+            'Phone_number_of_Focal_point': 'VARCHAR(255)',
+            'Official_Email_Address': 'VARCHAR(255)',
+            'Official_Website': 'VARCHAR(255)',
+            'GSTIN': 'VARCHAR(255)',
+            'Name_Designation': 'VARCHAR(255)',
+            'Dept_Ministry': 'VARCHAR(255)',
+            'E_mail': 'VARCHAR(255)',
+            'Phone_No': 'VARCHAR(255)',
+            'Date_': 'DATE',
+            'Approval': 'VARCHAR(5)'
+            # Add more mappings as needed
+        }
+
+        self.create_connection("localhost", "root", "abc@123456789", "pdf_database")
+        self.create_table("pdf_records", pattern_dict_keys, "pdf_database")
+
 
     def create_connection(self, host_name, user_name, user_password, database):
         try:
             self.connection = mysql.connector.connect(
-                host = host_name,
-                user = user_name,
-                password = user_password,
-                database = database
+                host=host_name,
+                user=user_name,
+                password=user_password,
+                database=database
             )
-
             self.cursor = self.connection.cursor()
 
-            # Create table
-            self.cursor.execute('''
-                CREATE TABLE IF NOT EXISTS documents (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    from VARCHAR(255),
-                        ,
-                    pdf_data LONGBLOB,
-                    description TEXT
-                )
-            ''')
-
-            self.connection.commit()
-
         except Error as e:
-            print(f"Error: {e}")
+            print(f"Error: {str(e)}")
+            # If the database doesn't exist, create it
+            if "1049" in str(e):  # MySQL error code for "unknown database"
+                print("Creating Database..")
+                self.connection = mysql.connector.connect(
+                    host=host_name,
+                    user=user_name,
+                    password=user_password,
+                )
+                self.cursor = self.connection.cursor()
+                self.create_database(database)
 
-    def create_database(self, query):
-        self.cursor = self.connection.cursor()
-        try:
-            self.cursor.execute(query)
-            print("Database created successfully!!")
+    def create_database(self, db_name):
+        query = f"CREATE DATABASE IF NOT EXISTS {db_name}"
         
-        except Error as err:
+        try:
+            self.execute_query(query)
+            print(f"Database '{db_name}' created successfully!!")
+
+        except (Exception, Error) as err:
             print(f"Error: '{err}'")
 
-    def execute_query(self, query):
+    def create_table(self, table_name, keys, database):
+        self.execute_query(f"USE {database}")  # Switch to the specified database
 
-        cursor = self.connection.cursor()
+        # Create a list of columns with appropriate data types based on the mapping
+        columns = [f"{key.lower()} {self.data_type_mapping[key].lower()}" for key in keys]
+        columns.extend(["pdf_data LONGBLOB", "pdf_name VARCHAR(255)"])  # Add fields for storing PDF files and PDF names
+
+        query = f'''
+            CREATE TABLE IF NOT EXISTS {table_name} (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                {', '.join(columns)}
+            )
+        '''
         try:
-            cursor.execute(query)
+            self.execute_query(query)
+            print(f"Table '{table_name}' created successfully!!")
+
+        except (Exception, Error) as err:
+            print(f"Error: '{err}'")
+
+    def create_record(self, table_name, record_dict):
+        
+        columns = ', '.join([f"{key.lower()}" for key in record_dict.keys()])
+        placeholders = ', '.join(['%s'] * len(record_dict))
+        query = f"INSERT INTO {table_name} ({columns}) \nVALUES ({placeholders})"
+        dict_type = [type(z) for z in record_dict.values()]
+        try:
+            record_values = list(record_dict.values())
+            self.execute_query(query, tuple(record_values))
+            
+            print("Record created successfully!")
+
+        except (Exception, Error) as err:
+            print(f"Error: '{err}'")
+
+    def update_record(self, table_name, update_dict, condition_dict):
+        set_clause = ', '.join([f"{key} = %s" for key in update_dict.keys()])
+        condition_clause = ' AND '.join([f"{key} = %s" for key in condition_dict.keys()])
+        query = f"UPDATE {table_name} SET {set_clause} WHERE {condition_clause}"
+
+        try:
+            values = list(update_dict.values()) + list(condition_dict.values())
+            self.execute_query(query, tuple(values))
+            print("Record updated successfully!")
+
+        except (Exception, Error) as err:
+            print(f"Error: '{err}'")
+
+    def execute_query(self, query, values=None):
+        try:
+            self.cursor.execute(query, values)
             self.connection.commit()
             print("Query was successful")
-        
-        except Error as err:
+
+        except (Exception, Error) as err:
             print(f"Error: '{err}'")
 
-    
-    def create_query(self):
-        pass
+# Usage example:
+pattern_dict_keys = [
+    'Sender', 'PAO_Code', 'Entity_Name', 'Ministry_Department',
+    'Sender_Name', 'Central_Govt_State_Govt', 'Focal_point_with_official_designation',
+    'Full_office_Address_wih_pin_code', 'Full_address_of_Focal_point',
+    'Phone_number_of_Focal_point', 'Official_Email_Address', 'Official_Website',
+    'GSTIN', 'Name_Designation', 'Dept_Ministry', 'E_mail', 'Phone_No', 'Date_','Approval'
+]
 
-def create_database():
-    try:
-        connection = mysql.connector.connect(
-            host='localhost',
-            user='root',
-            password='',
-            database='email_extraction_db'
-        )
+# if __name__ == '__main__':
 
-        cursor = connection.cursor()
+#     db_manager = Manage_DB()
+#     db_manager.create_connection("localhost", "root", "root", "")
+#     db_manager.create_table("documents", pattern_dict_keys, "your_database_name")
 
-        # Create table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS documents (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                from VARCHAR(255),
-                       ,
-                pdf_data LONGBLOB,
-                description TEXT
-            )
-        ''')
-
-        connection.commit()
-
-    except Error as e:
-        print(f"Error: {e}")
-
-    finally:
-        if connection.is_connected():
-            cursor.close()
-            connection.close()
-
-# Function to insert a PDF document into the MySQL database
-def insert_document(title, file_path, description):
-    try:
-        connection = mysql.connector.connect(
-            host='your_mysql_host',
-            user='your_mysql_user',
-            password='your_mysql_password',
-            database='your_database_name'
-        )
-
-        cursor = connection.cursor()
-
-        # Read PDF file data
-        with open(file_path, 'rb') as file:
-            pdf_data = file.read()
-
-        # Insert data into the table
-        cursor.execute('''
-            INSERT INTO documents (title, pdf_data, description)
-            VALUES (%s, %s, %s)
-        ''', (title, pdf_data, description))
-
-        connection.commit()
-
-    except Error as e:
-        print(f"Error: {e}")
-
-    finally:
-        if connection.is_connected():
-            cursor.close()
-            connection.close()
-
-# Function to retrieve and display a document from the MySQL database
-def retrieve_document(document_id):
-    try:
-        connection = mysql.connector.connect(
-            host='your_mysql_host',
-            user='your_mysql_user',
-            password='your_mysql_password',
-            database='your_database_name'
-        )
-
-        cursor = connection.cursor()
-
-        # Retrieve data from the table
-        cursor.execute('''
-            SELECT id, title, description
-            FROM documents
-            WHERE id = %s
-        ''', (document_id,))
-
-        row = cursor.fetchone()
-
-        if row:
-            print(f"Document ID: {row[0]}")
-            print(f"Title: {row[1]}")
-            print(f"Description: {row[2]}")
-        else:
-            print("Document not found")
-
-    except Error as e:
-        print(f"Error: {e}")
-
-    finally:
-        if connection.is_connected():
-            cursor.close()
-            connection.close()
-
-# Main program
-if __name__ == "__main__":
-    # Create MySQL database and table
-    create_database()
-
-    # Insert a sample document
-    insert_document('Sample Document', 'path/to/pdf/sample.pdf', 'A sample PDF document')
-
-    # Retrieve and display the document
-    retrieve_document(1)

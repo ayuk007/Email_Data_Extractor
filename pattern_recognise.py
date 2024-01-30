@@ -24,23 +24,23 @@ def pattern_results(pdf_text)-> dict():
     date_pattern = re.compile(r'Date\s*:\s*(.+?)\n', re.IGNORECASE)
 
 
-    pattern_dict['From'] = from_pattern.search(pdf_text).group(1)
-    pattern_dict['PAO* Code'] = Pao_pattern.search(pdf_text).group(1)
-    pattern_dict['Entity Name'] = entity_pattern.search(pdf_text).group(1)
-    pattern_dict['Ministry/Department'] = organization_pattern.search(pdf_text).group(1)
-    pattern_dict['Sender Name'] = dr_name_pattern.search(pdf_text).group(1)
-    pattern_dict['Central Govt./State Govt.'] = govt_pattern.search(pdf_text).group(1)
-    pattern_dict['Focal point with official designation'] = official_designation_pattern.search(pdf_text).group(1) #.group(1).split(':')[1]
-    pattern_dict['Full office Address wih pin code'] = full_address_pattern.search(pdf_text).group(1) #.group(1).split(':')[1]
-    pattern_dict['Full address of Focal point'] = full_focal_address_pattern.search(pdf_text).group(1)
-    pattern_dict['Phone number of Focal point'] = ph_number_pattern.search(pdf_text).group(1)
-    pattern_dict['Official Email Address'] = official_email_address_pattern.search(pdf_text).group(1)
-    pattern_dict['Official Website'] = official_website_pattern.search(pdf_text).group(1)
+    pattern_dict['Sender'] = from_pattern.search(pdf_text).group(1)
+    pattern_dict['PAO_Code'] = Pao_pattern.search(pdf_text).group(1)
+    pattern_dict['Entity_Name'] = entity_pattern.search(pdf_text).group(1)
+    pattern_dict['Ministry_Department'] = organization_pattern.search(pdf_text).group(1)
+    pattern_dict['Sender_Name'] = dr_name_pattern.search(pdf_text).group(1)
+    pattern_dict['Central_Govt_State_Govt'] = govt_pattern.search(pdf_text).group(1)
+    pattern_dict['Focal_point_with_official_designation'] = official_designation_pattern.search(pdf_text).group(1) #.group(1).split(':')[1]
+    pattern_dict['Full_office_Address_wih_pin_code'] = full_address_pattern.search(pdf_text).group(1) #.group(1).split(':')[1]
+    pattern_dict['Full_address_of_Focal_point'] = full_focal_address_pattern.search(pdf_text).group(1)
+    pattern_dict['Phone_number_of_Focal_point'] = ph_number_pattern.search(pdf_text).group(1)
+    pattern_dict['Official_Email_Address'] = official_email_address_pattern.search(pdf_text).group(1)
+    pattern_dict['Official_Website'] = official_website_pattern.search(pdf_text).group(1)
     pattern_dict['GSTIN'] = gstin_pattern.search(pdf_text).group(1) #.group(1).split('(')[0]
-    pattern_dict['Name & Designation'] = name_designation_pattern.search(pdf_text).group(1)
-    pattern_dict['Dept./Ministry'] = dept_ministry_pattern.search(pdf_text).group(1)
-    pattern_dict['E-mail'] = email_pattern.search(pdf_text).group(1)
-    pattern_dict['Pnone No.'] = phone_pattern.search(pdf_text).group(1)
-    pattern_dict['Date'] = date_pattern.search(pdf_text).group(1)
+    pattern_dict['Name_Designation'] = name_designation_pattern.search(pdf_text).group(1)
+    pattern_dict['Dept_Ministry'] = dept_ministry_pattern.search(pdf_text).group(1)
+    pattern_dict['E_mail'] = email_pattern.search(pdf_text).group(1)
+    pattern_dict['Phone_No'] = phone_pattern.search(pdf_text).group(1)
+    pattern_dict['Date_'] = date_pattern.search(pdf_text).group(1).replace(" ","")
 
     return pattern_dict
