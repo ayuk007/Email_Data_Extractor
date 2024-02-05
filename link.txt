@@ -1,1 +1,33 @@
 https://nagasudhir.blogspot.com/2022/01/cxoracle-python-module-for-oracle.html?m=1
+
+def create_record(self, table_name, record_dict):
+    domain_name = record_dict.get('domain_name', None)
+    usage_flag = record_dict.get('usage_flag', False)
+
+    # Check if there is an existing record with the same domain name and usage_flag = true
+    existing_record_query = f"SELECT * FROM {table_name} WHERE domain_name = %s AND usage_flag = TRUE"
+    existing_record_values = (domain_name,)
+
+    try:
+        self.cursor.execute(existing_record_query, existing_record_values)
+        existing_record = self.cursor.fetchone()
+
+        if existing_record:
+            # Update existing record's usage_flag to false
+            update_query = f"UPDATE {table_name} SET usage_flag = FALSE WHERE id = %s"
+            self.execute_query(update_query, (existing_record[0],))
+
+    except (Exception, Error) as err:
+        print(f"Error checking existing record: {err}")
+
+    # Insert the new record
+    columns = ', '.join(record_dict.keys())
+    placeholders = ', '.join(['%s'] * len(record_dict))
+    insert_query = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
+    
+    try:
+        self.execute_query(insert_query, tuple(record_dict.values()))
+        print("Record created successfully!")
+
+    except (Exception, Error) as err:
+        print(f"Error inserting record: {err}")
