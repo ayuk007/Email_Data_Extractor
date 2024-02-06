@@ -8,6 +8,7 @@ import PyPDF2
 from pattern_recognise import pattern_results
 from db_manage import Manage_DB
 import json
+import datetime
 
 app = FastAPI()
 
@@ -73,7 +74,7 @@ async def add_record(file: UploadFile = File(...), approval: str = Form(...), pd
         pdfData["Pdf_Data"] = pdf_text
         pdfData["Pdf_Name"] = file.filename
         pdfData["Approval"] = approval
-
+        pdfData["timestamp"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         db_manager = Manage_DB()  # Initialize the database manager
 

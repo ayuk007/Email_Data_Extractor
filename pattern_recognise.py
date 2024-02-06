@@ -22,6 +22,7 @@ def pattern_results(pdf_text)-> dict():
     email_pattern = re.compile(r'E-mail\s*:\s*(.+?)\n', re.IGNORECASE)
     phone_pattern = re.compile(r'Phone\s+No\s*:\s*(.+?)\n', re.IGNORECASE)
     date_pattern = re.compile(r'Date\s*:\s*(.+?)\n', re.IGNORECASE)
+    
 
 
     pattern_dict['Sender'] = from_pattern.search(pdf_text).group(1)
@@ -42,5 +43,6 @@ def pattern_results(pdf_text)-> dict():
     pattern_dict['E_mail'] = email_pattern.search(pdf_text).group(1)
     pattern_dict['Phone_No'] = phone_pattern.search(pdf_text).group(1)
     pattern_dict['Date_'] = date_pattern.search(pdf_text).group(1).replace(" ","")
+    pattern_dict['Domain_Name']  =pattern_dict['Official_Email_Address'].split('@')[1]
 
     return pattern_dict

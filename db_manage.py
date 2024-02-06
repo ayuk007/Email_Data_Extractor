@@ -23,9 +23,15 @@ class Manage_DB:
             'E_mail': 'VARCHAR(255)',
             'Phone_No': 'VARCHAR(255)',
             'Date_': 'DATE',
-            'Approval': 'VARCHAR(5)'
+            'Pdf_Data': 'LONGBLOB',
+            'Pdf_Name': 'VARCHAR(255)',
+            'Approval': 'VARCHAR(5)',
+            'Domain_Name': 'VARCHAR(255)',  # Add data type for Domain_Name
+            'Timestamp': 'DATETIME',       # Add data type for Timestamp
+            'Usage_Flag': 'BOOLEAN'         # Assuming BOOLEAN; adjust if necessary
             # Add more mappings as needed
         }
+
 
         self.create_connection("localhost", "root", "abc@123456789", "pdf_database")
         self.create_table("pdf_records", pattern_dict_keys, "pdf_database")
@@ -69,7 +75,8 @@ class Manage_DB:
 
         # Create a list of columns with appropriate data types based on the mapping
         columns = [f"{key.lower()} {self.data_type_mapping[key].lower()}" for key in keys]
-        columns.extend(["pdf_data LONGBLOB", "pdf_name VARCHAR(255)"])  # Add fields for storing PDF files and PDF names
+        columns.extend(["pdf_data LONGBLOB", "pdf_name VARCHAR(255)", "timestamp DATETIME",
+                        "usage_flag BOOLEAN" ])  # Add fields for storing PDF files and PDF names
 
         query = f'''
             CREATE TABLE IF NOT EXISTS {table_name} (
@@ -84,20 +91,55 @@ class Manage_DB:
         except (Exception, Error) as err:
             print(f"Error: '{err}'")
 
-    def create_record(self, table_name, record_dict):
+    # def create_record(self, table_name, record_dict):
         
-        columns = ', '.join([f"{key.lower()}" for key in record_dict.keys()])
-        placeholders = ', '.join(['%s'] * len(record_dict))
-        query = f"INSERT INTO {table_name} ({columns}) \nVALUES ({placeholders})"
-        dict_type = [type(z) for z in record_dict.values()]
-        try:
-            record_values = list(record_dict.values())
-            self.execute_query(query, tuple(record_values))
+    #     # columns = ', '.join([f"{key.lower()}" for key in record_dict.keys()])
+    #     # placeholders = ', '.join(['%s'] * len(record_dict))
+    #     # query = f"INSERT INTO {table_name} ({columns}) \nVALUES ({placeholders})"
+    #     # dict_type = [type(z) for z in record_dict.values()]
+    #     # try:
+    #     #     record_values = list(record_dict.values())
+    #     #     self.execute_query(query, tuple(record_values))
             
+    #     #     print("Record created successfully!")
+
+    #     # except (Exception, Error) as err:
+    #     #     print(f"Error: '{err}'")
+
+    def create_record(self, table_name, record_dict):
+        domain_name = record_dict['Domain_Name']
+        # usage_flag = record_dict.get('usage_flag', False)
+        record_dict['usage_flag'] = True
+        # Check if there is an existing record with the same domain name and usage_flag = true
+        existing_record_query = f"SELECT * FROM {table_name} WHERE domain_name = %s AND usage_flag = TRUE"
+        existing_record_values = (domain_name,)
+
+        try:
+            self.cursor.execute(existing_record_query, existing_record_values)
+            existing_record = self.cursor.fetchone()
+
+            if existing_record:
+                # Update existing record's usage_flag to false
+                update_query = f"UPDATE {table_name} SET usage_flag = FALSE WHERE id = %s"
+                self.execute_query(update_query, (existing_record[0],))
+
+        except (Exception, Error) as err:
+            print(f"Error checking existing record: {err}")
+
+        # Include current timestamp in the record_dict
+        # record_dict['timestamp'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        # Insert the new record
+        columns = ', '.join(record_dict.keys())
+        placeholders = ', '.join(['%s'] * len(record_dict))
+        insert_query = f"INSERT INTO {table_name} ({columns}) \nVALUES ({placeholders})"
+
+        try:
+            self.execute_query(insert_query, tuple(record_dict.values()))
             print("Record created successfully!")
 
         except (Exception, Error) as err:
-            print(f"Error: '{err}'")
+            print(f"Error inserting record: {err}")
 
     def update_record(self, table_name, update_dict, condition_dict):
         set_clause = ', '.join([f"{key} = %s" for key in update_dict.keys()])
@@ -127,7 +169,7 @@ pattern_dict_keys = [
     'Sender_Name', 'Central_Govt_State_Govt', 'Focal_point_with_official_designation',
     'Full_office_Address_wih_pin_code', 'Full_address_of_Focal_point',
     'Phone_number_of_Focal_point', 'Official_Email_Address', 'Official_Website',
-    'GSTIN', 'Name_Designation', 'Dept_Ministry', 'E_mail', 'Phone_No', 'Date_','Approval'
+    'GSTIN', 'Name_Designation', 'Dept_Ministry', 'E_mail', 'Phone_No', 'Date_','Approval', 'Domain_Name'
 ]
 
 # if __name__ == '__main__':
