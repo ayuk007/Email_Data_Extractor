@@ -162,3 +162,53 @@ function App() {
 }
 
 export default App;
+
+
+
+
+import sqlite3
+import io
+import PyPDF2
+import fitz
+from PIL import Image
+
+# Function to convert PDF to image
+def pdf_to_image(pdf_path):
+    images = []
+    pdf_document = fitz.open(pdf_path)
+    for page_num in range(len(pdf_document)):
+        page = pdf_document.load_page(page_num)
+        image = page.get_pixmap()
+        img_bytes = io.BytesIO(image.get_png_data())
+        img = Image.open(img_bytes)
+        images.append(img)
+    return images
+
+# Function to save images to SQLite database
+def save_images_to_db(images, db_name='pdf_images.db'):
+    conn = sqlite3.connect(db_name)
+    cursor = conn.cursor()
+
+    # Create table if not exists
+    cursor.execute('''CREATE TABLE IF NOT EXISTS pdf_images
+                      (id INTEGER PRIMARY KEY, image BLOB)''')
+
+    # Insert images into the database
+    for image in images:
+        img_byte_arr = io.BytesIO()
+        image.save(img_byte_arr, format='PNG')
+        img_byte_arr = img_byte_arr.getvalue()
+        cursor.execute("INSERT INTO pdf_images (image) VALUES (?)", (sqlite3.Binary(img_byte_arr),))
+
+    # Commit changes and close connection
+    conn.commit()
+    conn.close()
+
+# Main function
+def main(pdf_path):
+    images = pdf_to_image(pdf_path)
+    save_images_to_db(images)
+
+if __name__ == "__main__":
+    pdf_path = "example.pdf"  # Change this to your PDF file path
+    main(pdf_path)
