@@ -31,3 +31,134 @@ def create_record(self, table_name, record_dict):
 
     except (Exception, Error) as err:
         print(f"Error inserting record: {err}")
+
+
+// App.js
+import React, { useState } from 'react';
+import FileInput from './components/FileInput';
+import PdfDisplay from './components/PdfDisplay';
+import { uploadFile, addRecord } from './service';
+
+function App() {
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [pdfData, setPdfData] = useState(null);
+  const [approval, setApproval] = useState(null);
+  const [tableData, setTableData] = useState([]); // State to store table data
+
+  const handleFileChange = (file, data) => {
+    setSelectedFile(file);
+    setPdfData(data);
+    setApproval(null);
+  };
+
+  const handleFileUpload = async () => {
+    try {
+      if (selectedFile) {
+        const response = await uploadFile(selectedFile, pdfData);
+        setPdfData(response.data);
+        setApproval(null);
+      }
+    } catch (error) {
+      console.error('Error uploading file:', error);
+    }
+  };
+
+  const handleApprovalChange = (event) => {
+    setApproval(event.target.value);
+  };
+
+  const handleEdit = (rowIndex, columnIndex, value) => {
+    // Update the value in the copied table data
+    const updatedData = [...tableData];
+    updatedData[rowIndex][columnIndex] = value;
+    setTableData(updatedData);
+  };
+
+  const handleSubmit = async () => {
+    try {
+      if (approval && selectedFile) {
+        // Add the record to the database
+        await addRecord(selectedFile, approval, pdfData);
+        // Log the approval status to the console
+        console.log(`File approval status: ${approval}`);
+      }
+    } catch (error) {
+      console.error('Error submitting:', error);
+    }
+  };
+
+  const handleTableSubmit = async () => {
+    try {
+      // Send the edited table data to the backend
+      // Implement your logic to send the data to FastAPI
+      console.log('Edited table data:', tableData);
+    } catch (error) {
+      console.error('Error submitting table data:', error);
+    }
+  };
+
+  return (
+    <div>
+      <h1>PDF Reader App</h1>
+      <FileInput onFileChange={handleFileChange} onFileUpload={handleFileUpload} />
+      {pdfData && <PdfDisplay pdfData={pdfData} />}
+      {pdfData && (
+        <div>
+          <h2>Approve:</h2>
+          <label>
+            <input
+              type="radio"
+              value="GE"
+              checked={approval === 'GE'}
+              onChange={handleApprovalChange}
+            />
+            GE
+          </label>
+          <label>
+            <input
+              type="radio"
+              value="NGE"
+              checked={approval === 'NGE'}
+              onChange={handleApprovalChange}
+            />
+            NGE
+          </label>
+          <br />
+          <button onClick={handleSubmit}>Submit</button>
+        </div>
+      )}
+
+      {/* Simple editable table */}
+      <div>
+        <h2>Editable Table</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Column 1</th>
+              <th>Column 2</th>
+              {/* Add more table headers as needed */}
+            </tr>
+          </thead>
+          <tbody>
+            {tableData.map((row, rowIndex) => (
+              <tr key={rowIndex}>
+                {row.map((cell, columnIndex) => (
+                  <td key={columnIndex}>
+                    <input
+                      type="text"
+                      value={tableData[rowIndex][columnIndex]}
+                      onChange={(e) => handleEdit(rowIndex, columnIndex, e.target.value)}
+                    />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <button onClick={handleTableSubmit}>Submit Table Data</button>
+      </div>
+    </div>
+  );
+}
+
+export default App;
