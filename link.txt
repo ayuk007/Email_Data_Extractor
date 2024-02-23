@@ -212,3 +212,62 @@ def main(pdf_path):
 if __name__ == "__main__":
     pdf_path = "example.pdf"  # Change this to your PDF file path
     main(pdf_path)
+
+
+
+
+import sqlite3
+import io
+import PyPDF2
+import fitz
+from PIL import Image
+
+# Function to convert PDF to a single combined image
+def pdf_to_combined_image(pdf_path):
+    images = []
+    pdf_document = fitz.open(pdf_path)
+    for page_num in range(len(pdf_document)):
+        page = pdf_document.load_page(page_num)
+        image = page.get_pixmap()
+        img_bytes = io.BytesIO(image.get_png_data())
+        img = Image.open(img_bytes)
+        images.append(img)
+
+    # Combine images vertically
+    combined_image = Image.new('RGB', (max(img.width for img in images), sum(img.height for img in images)))
+    y_offset = 0
+    for img in images:
+        combined_image.paste(img, (0, y_offset))
+        y_offset += img.height
+
+    return combined_image
+
+# Function to save combined image to SQLite database
+def save_combined_image_to_db(combined_image, db_name='pdf_images.db'):
+    conn = sqlite3.connect(db_name)
+    cursor = conn.cursor()
+
+    # Create table if not exists
+    cursor.execute('''CREATE TABLE IF NOT EXISTS pdf_combined_images
+                      (id INTEGER PRIMARY KEY, image BLOB)''')
+
+    # Convert combined image to bytes
+    img_byte_arr = io.BytesIO()
+    combined_image.save(img_byte_arr, format='PNG')
+    img_byte_arr = img_byte_arr.getvalue()
+
+    # Insert combined image into the database
+    cursor.execute("INSERT INTO pdf_combined_images (image) VALUES (?)", (sqlite3.Binary(img_byte_arr),))
+
+    # Commit changes and close connection
+    conn.commit()
+    conn.close()
+
+# Main function
+def main(pdf_path):
+    combined_image = pdf_to_combined_image(pdf_path)
+    save_combined_image_to_db(combined_image)
+
+if __name__ == "__main__":
+    pdf_path = "example.pdf"  # Change this to your PDF file path
+    main(pdf_path)
