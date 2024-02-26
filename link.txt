@@ -1,38 +1,3 @@
-https://nagasudhir.blogspot.com/2022/01/cxoracle-python-module-for-oracle.html?m=1
-
-def create_record(self, table_name, record_dict):
-    domain_name = record_dict.get('domain_name', None)
-    usage_flag = record_dict.get('usage_flag', False)
-
-    # Check if there is an existing record with the same domain name and usage_flag = true
-    existing_record_query = f"SELECT * FROM {table_name} WHERE domain_name = %s AND usage_flag = TRUE"
-    existing_record_values = (domain_name,)
-
-    try:
-        self.cursor.execute(existing_record_query, existing_record_values)
-        existing_record = self.cursor.fetchone()
-
-        if existing_record:
-            # Update existing record's usage_flag to false
-            update_query = f"UPDATE {table_name} SET usage_flag = FALSE WHERE id = %s"
-            self.execute_query(update_query, (existing_record[0],))
-
-    except (Exception, Error) as err:
-        print(f"Error checking existing record: {err}")
-
-    # Insert the new record
-    columns = ', '.join(record_dict.keys())
-    placeholders = ', '.join(['%s'] * len(record_dict))
-    insert_query = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
-    
-    try:
-        self.execute_query(insert_query, tuple(record_dict.values()))
-        print("Record created successfully!")
-
-    except (Exception, Error) as err:
-        print(f"Error inserting record: {err}")
-
-
 // App.js
 import React, { useState } from 'react';
 import FileInput from './components/FileInput';
@@ -43,19 +8,18 @@ function App() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [pdfData, setPdfData] = useState(null);
   const [approval, setApproval] = useState(null);
-  const [tableData, setTableData] = useState([]); // State to store table data
 
-  const handleFileChange = (file, data) => {
+  const handleFileChange = (file) => {
     setSelectedFile(file);
-    setPdfData(data);
+    // setPdfData(data);
     setApproval(null);
   };
 
   const handleFileUpload = async () => {
     try {
       if (selectedFile) {
-        const response = await uploadFile(selectedFile, pdfData);
-        setPdfData(response.data);
+        const response = await uploadFile(selectedFile);
+        setPdfData(response);
         setApproval(null);
       }
     } catch (error) {
@@ -65,13 +29,6 @@ function App() {
 
   const handleApprovalChange = (event) => {
     setApproval(event.target.value);
-  };
-
-  const handleEdit = (rowIndex, columnIndex, value) => {
-    // Update the value in the copied table data
-    const updatedData = [...tableData];
-    updatedData[rowIndex][columnIndex] = value;
-    setTableData(updatedData);
   };
 
   const handleSubmit = async () => {
@@ -87,21 +44,11 @@ function App() {
     }
   };
 
-  const handleTableSubmit = async () => {
-    try {
-      // Send the edited table data to the backend
-      // Implement your logic to send the data to FastAPI
-      console.log('Edited table data:', tableData);
-    } catch (error) {
-      console.error('Error submitting table data:', error);
-    }
-  };
-
   return (
     <div>
       <h1>PDF Reader App</h1>
       <FileInput onFileChange={handleFileChange} onFileUpload={handleFileUpload} />
-      {pdfData && <PdfDisplay pdfData={pdfData} />}
+      {pdfData && <PdfDisplay pdfData={pdfData} setPdfData={setPdfData}/>}
       {pdfData && (
         <div>
           <h2>Approve:</h2>
@@ -127,36 +74,6 @@ function App() {
           <button onClick={handleSubmit}>Submit</button>
         </div>
       )}
-
-      {/* Simple editable table */}
-      <div>
-        <h2>Editable Table</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Column 1</th>
-              <th>Column 2</th>
-              {/* Add more table headers as needed */}
-            </tr>
-          </thead>
-          <tbody>
-            {tableData.map((row, rowIndex) => (
-              <tr key={rowIndex}>
-                {row.map((cell, columnIndex) => (
-                  <td key={columnIndex}>
-                    <input
-                      type="text"
-                      value={tableData[rowIndex][columnIndex]}
-                      onChange={(e) => handleEdit(rowIndex, columnIndex, e.target.value)}
-                    />
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <button onClick={handleTableSubmit}>Submit Table Data</button>
-      </div>
     </div>
   );
 }
@@ -166,108 +83,62 @@ export default App;
 
 
 
-import sqlite3
-import io
-import PyPDF2
-import fitz
-from PIL import Image
 
-# Function to convert PDF to image
-def pdf_to_image(pdf_path):
-    images = []
-    pdf_document = fitz.open(pdf_path)
-    for page_num in range(len(pdf_document)):
-        page = pdf_document.load_page(page_num)
-        image = page.get_pixmap()
-        img_bytes = io.BytesIO(image.get_png_data())
-        img = Image.open(img_bytes)
-        images.append(img)
-    return images
+// PdfDisplay.js
+import React, { useState } from 'react';
+import '../style.css';
 
-# Function to save images to SQLite database
-def save_images_to_db(images, db_name='pdf_images.db'):
-    conn = sqlite3.connect(db_name)
-    cursor = conn.cursor()
+const PdfDisplay = ({ pdfData, setPdfData }) => {
+  const [editablePdfData, setEditablePdfData] = useState(pdfData);
 
-    # Create table if not exists
-    cursor.execute('''CREATE TABLE IF NOT EXISTS pdf_images
-                      (id INTEGER PRIMARY KEY, image BLOB)''')
+  const handleValueChange = (key, newValue) => {
+    setEditablePdfData(prevData => ({
+      ...prevData,
+      [key]: newValue
+    }));
+  };
 
-    # Insert images into the database
-    for image in images:
-        img_byte_arr = io.BytesIO()
-        image.save(img_byte_arr, format='PNG')
-        img_byte_arr = img_byte_arr.getvalue()
-        cursor.execute("INSERT INTO pdf_images (image) VALUES (?)", (sqlite3.Binary(img_byte_arr),))
+  const handleSaveChanges = () => {
+    // Create a new object with updated values
+    const updatedPdfData = { ...pdfData, ...editablePdfData };
+    // Update the pdfData state in App.js
+    setPdfData(updatedPdfData);
+  };
 
-    # Commit changes and close connection
-    conn.commit()
-    conn.close()
+  const renderTable = () => {
+    return (
+      <table className="pdf-table">
+        <thead>
+          <tr>
+            <th>Key</th>
+            <th>Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          {Object.entries(editablePdfData).map(([key, value]) => (
+            <tr key={key}>
+              <td className="pdf-key">{key}</td>
+              <td>
+                <input
+                  type="text"
+                  value={value}
+                  onChange={(e) => handleValueChange(key, e.target.value)}
+                />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    );
+  };
 
-# Main function
-def main(pdf_path):
-    images = pdf_to_image(pdf_path)
-    save_images_to_db(images)
+  return (
+    <div>
+      <h2>PDF Data:</h2>
+      {renderTable()}
+      <button onClick={handleSaveChanges}>Save Changes</button>
+    </div>
+  );
+};
 
-if __name__ == "__main__":
-    pdf_path = "example.pdf"  # Change this to your PDF file path
-    main(pdf_path)
-
-
-
-
-import sqlite3
-import io
-import PyPDF2
-import fitz
-from PIL import Image
-
-# Function to convert PDF to a single combined image
-def pdf_to_combined_image(pdf_path):
-    images = []
-    pdf_document = fitz.open(pdf_path)
-    for page_num in range(len(pdf_document)):
-        page = pdf_document.load_page(page_num)
-        image = page.get_pixmap()
-        img_bytes = io.BytesIO(image.get_png_data())
-        img = Image.open(img_bytes)
-        images.append(img)
-
-    # Combine images vertically
-    combined_image = Image.new('RGB', (max(img.width for img in images), sum(img.height for img in images)))
-    y_offset = 0
-    for img in images:
-        combined_image.paste(img, (0, y_offset))
-        y_offset += img.height
-
-    return combined_image
-
-# Function to save combined image to SQLite database
-def save_combined_image_to_db(combined_image, db_name='pdf_images.db'):
-    conn = sqlite3.connect(db_name)
-    cursor = conn.cursor()
-
-    # Create table if not exists
-    cursor.execute('''CREATE TABLE IF NOT EXISTS pdf_combined_images
-                      (id INTEGER PRIMARY KEY, image BLOB)''')
-
-    # Convert combined image to bytes
-    img_byte_arr = io.BytesIO()
-    combined_image.save(img_byte_arr, format='PNG')
-    img_byte_arr = img_byte_arr.getvalue()
-
-    # Insert combined image into the database
-    cursor.execute("INSERT INTO pdf_combined_images (image) VALUES (?)", (sqlite3.Binary(img_byte_arr),))
-
-    # Commit changes and close connection
-    conn.commit()
-    conn.close()
-
-# Main function
-def main(pdf_path):
-    combined_image = pdf_to_combined_image(pdf_path)
-    save_combined_image_to_db(combined_image)
-
-if __name__ == "__main__":
-    pdf_path = "example.pdf"  # Change this to your PDF file path
-    main(pdf_path)
+export default PdfDisplay;
