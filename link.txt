@@ -199,3 +199,18 @@ if pattern.search(b):
     print("String 'a' is present in 'b' regardless of whitespace.")
 else:
     print("String 'a' is not present in 'b'.")
+
+
+import re
+
+date_string = "Today is February 27, 2024, and there's some junk here."
+# Define a regular expression pattern to match the date
+pattern = re.compile(r'\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2},?\s+\d{4}\b|\b\d{1,2}/\d{1,2}/\d{4}\b')
+
+# Find the date in the string
+match = pattern.search(date_string)
+
+if match:
+    print("Date found:", match.group())
+else:
+    print("No date found in the string.")
