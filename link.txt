@@ -1,4 +1,24 @@
-// App.js
+import re
+
+a = "hello world"
+b = "   hello     world   "
+
+pattern = re.compile(r'\b{}\b'.format(re.escape(a.replace(" ", r'\s*'))))
+if pattern.search(b):
+    print("String 'a' is present in 'b' regardless of whitespace.")
+else:
+    print("String 'a' is not present in 'b'.")
+import re
+
+a = "hello world"
+b = "   hello     world   "
+
+pattern = re.compile(r'\b{}\b'.format(re.escape(a.replace(" ", r'\s*'))))
+if pattern.search(b):
+    print("String 'a' is present in 'b' regardless of whitespace.")
+else:
+    print("String 'a' is not present in 'b'.")
+ App.js
 import React, { useState } from 'react';
 import FileInput from './components/FileInput';
 import PdfDisplay from './components/PdfDisplay';
@@ -166,3 +186,16 @@ if is_pdf_content_image_only(pdf_path):
     print("The PDF content is all images.")
 else:
     print("The PDF content contains text or characters.")
+
+
+
+import re
+
+a = "hello world"
+b = "   hello     world   "
+
+pattern = re.compile(r'\b{}\b'.format(re.escape(a.replace(" ", r'\s*'))))
+if pattern.search(b):
+    print("String 'a' is present in 'b' regardless of whitespace.")
+else:
+    print("String 'a' is not present in 'b'.")
