@@ -214,3 +214,72 @@ if match:
     print("Date found:", match.group())
 else:
     print("No date found in the string.")
+
+
+
+// ApiTable.js
+import React from 'react';
+
+const ApiTable = ({ tableData }) => {
+  const columns = Object.keys(tableData);
+  const rows = Object.values(tableData)[0].length; // Assuming all columns have the same number of values
+
+  return (
+    <div>
+      <h2>API Table:</h2>
+      <table>
+        <thead>
+          <tr>
+            {columns.map((columnName, index) => (
+              <th key={index}>{columnName}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {[...Array(rows)].map((_, rowIndex) => (
+            <tr key={rowIndex}>
+              {columns.map((columnName, colIndex) => (
+                <td key={colIndex}>{tableData[columnName][rowIndex]}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
+export default ApiTable;
+
+
+// ApiTable.js
+import React from 'react';
+
+const ApiTable = ({ tableData }) => {
+  return (
+    <div>
+      <h2>API Table:</h2>
+      <table>
+        <thead>
+          <tr>
+            {Object.keys(tableData).map((columnName, index) => (
+              <th key={index}>{columnName}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {Object.values(tableData)[0].map((_, rowIndex) => (
+            <tr key={rowIndex}>
+              {Object.values(tableData).map((columnValues, colIndex) => (
+                <td key={colIndex}>{columnValues[rowIndex]}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
+export default ApiTable;
+
