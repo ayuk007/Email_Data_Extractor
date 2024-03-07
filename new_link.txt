@@ -1,0 +1,212 @@
+//PdfDisplay.js
+import React, { useState, useEffect } from "react";
+import "../style.css";
+import { addRecord, getQueryTable } from "../service";
+
+function PdfDisplay({
+  pdfData,
+  setPdfData,
+  approval,
+  setApproval,
+  selectedFile,
+}) {
+  const [editablePdfData, setEditablePdfData] = useState(pdfData);
+  const [buttonDisabled, setButtonDisabled] = useState(false);
+  const [queryRecords, setQueryRecords] = useState(null);
+  const [queryButtonDisabled, setQueryButtonDisabled] = useState(false);
+
+  useEffect(() => {
+    setEditablePdfData(pdfData); // Update editablePdfData when pdfData changes
+    setQueryRecords(null); // Clear queryRecords when pdfData changes
+    setQueryButtonDisabled(false);
+  }, [pdfData]);
+
+
+  const handleApprovalChange = (event) => {
+    setApproval(event.target.value);
+  };
+
+  const handleValueChange = (key, newValue) => {
+    setEditablePdfData((prevData) => ({
+      ...prevData,
+      [key]: newValue,
+    }));
+    setQueryButtonDisabled(false);
+    setQueryRecords(null);
+  };
+
+  const refreshPage = () => {
+    window.location.reload(false);
+  };
+
+  const handleSubmit = async () => {
+    try {
+      const val = prompt(
+        "Please verify Entity Name and Domain Name against the values in the PDF! \nWant to change press (Y) else (N):"
+      );
+
+      if (val.toLowerCase() === "n" && approval && selectedFile) {
+        setButtonDisabled(true);
+        const response = await addRecord(selectedFile, approval, pdfData);
+
+        if (response.status_code === 200) {
+          alert("Data Uploaded Successfully!!");
+          refreshPage();
+        }
+      }
+    } catch (error) {
+      console.error("Error submitting:", error);
+    }
+  };
+
+  const handleSaveChanges = () => {
+    const updatedPdfData = { ...pdfData, ...editablePdfData };
+
+    setPdfData(updatedPdfData);
+    pdfData = updatedPdfData;
+  };
+
+  const handleGetRecords = async () => {
+    try {
+      handleSaveChanges();
+      const response = await getQueryTable(pdfData);
+
+      if (response.status_code === 303) {
+        alert(response.Message);
+      } else {
+        console.log(response.USER_ID);
+        setQueryRecords(response);
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  const renderTable = () => {
+    return (
+      <div className="tables">
+        <div className="pdf-table-container">
+          <table className="pdf-table">
+            <thead>
+              <tr>
+                <th>Key</th>
+                <th>Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(editablePdfData).map(([key, value]) => (
+                <tr key={key}>
+                  <td className="pdf-key">{key}</td>
+                  <td className="table-value">
+                    <input
+                      style={{ width: "80%" }}
+                      type="text"
+                      value={value}
+                      onChange={(e) => handleValueChange(key, e.target.value)}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {queryRecords && (
+          <div>
+            <div className="table">
+              <table className="pdf-table">
+                <thead>
+                  <tr>
+                    {Object.keys(queryRecords).map((columnName, index) => (
+                      <th key={index}>{columnName}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.values(queryRecords)[0].map((_, rowIndex) => (
+                    <tr key={rowIndex}>
+                      {Object.values(queryRecords).map(
+                        (columnValues, colIndex) => (
+                          <td key={colIndex}>{columnValues[rowIndex]}</td>
+                        )
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+        <div className="approveDiv">
+          {queryRecords && (
+            <div className="approve">
+              <label style={{ margin: "10px", padding: "10px" }}>
+                <input
+                  type="radio"
+                  value="GE"
+                  checked={approval === "GE"}
+                  onChange={handleApprovalChange}
+                />
+                GE
+              </label>
+              <label style={{ margin: "10px", padding: "10px" }}>
+                <input
+                  type="radio"
+                  value="NGE"
+                  checked={approval === "NGE"}
+                  onChange={handleApprovalChange}
+                />
+                NGE
+              </label>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div>
+      {renderTable()}
+      <div>
+        {pdfData && (
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              margin: "10px",
+              padding: "30px",
+            }}
+          >
+            <br />
+            {!queryRecords && (
+              <button
+                hidden={queryButtonDisabled}
+                onClick={() => {
+                  handleGetRecords();
+                  // setQueryButton(true);
+                }}
+              >
+                GET USERS
+              </button>
+            )}
+
+            {approval && (
+              <button
+                className="button"
+                disabled={buttonDisabled}
+                onClick={() => {
+                  handleSaveChanges();
+                  handleSubmit();
+                }}
+              >
+                Submit
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default PdfDisplay;
