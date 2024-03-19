@@ -1,0 +1,771 @@
+#server.py
+import os
+import json
+import datetime
+import logging
+import traceback
+from pydantic import BaseModel
+from db_manage import Manage_DB
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, File, UploadFile, Form
+from utility import extract_pattern_pdf, get_pdf_data, is_pdf_content_image_only
+
+# Configure error logging
+error_logger = logging.getLogger('error_logger')
+error_logger.setLevel(logging.ERROR)
+error_handler = logging.FileHandler('logs/error.log')
+error_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s - %(filename)s:%(lineno)d')
+error_handler.setFormatter(error_formatter)
+error_logger.addHandler(error_handler)
+
+# Configure success logging
+success_logger = logging.getLogger('success_logger')
+success_logger.setLevel(logging.INFO)
+success_handler = logging.FileHandler('logs/success.log')
+success_formatter = logging.Formatter('%(asctime)s - %(message)s')
+success_handler.setFormatter(success_formatter)
+success_logger.addHandler(success_handler)
+
+
+app = FastAPI()
+
+# PORT = 8000
+
+# Allow all origins during development
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Initialize the database manager
+db_manager = Manage_DB()
+
+
+class Query_Dict(BaseModel):
+    domain: str
+    organization_name: str
+
+@app.post("/uploadfile/")
+async def create_upload_file(file: UploadFile = File(...)):
+    try:
+    # Save the uploaded file
+        print("Reading pdf_file")
+        
+        with open(file.filename, "wb") as f:
+            f.write(file.file.read())
+
+        if not is_pdf_content_image_only(file.filename):
+
+            # Process the PDF file
+            result_dict = extract_pattern_pdf(file.filename)
+           
+
+            return JSONResponse(content=result_dict, status_code=200)
+        else:
+            return JSONResponse(content = {"message": "Upload valid pdf file (which is not all image)!", "status_code" : 201})
+
+    except Exception as e:
+        # Log error
+        error_logger.error(f"Error in create_upload_file: {e} \n{traceback.format_exc()}")
+        return JSONResponse(content={"error": f"Internal Server Error: {e}"}, status_code=500)
+
+
+
+@app.post("/add_record/")
+async def add_record(file: UploadFile = File(...), approval: str = Form(...), pdfData: str = Form(...)):
+    print("Adding records")
+    try:
+        # Save the uploaded file
+        with open(file.filename, "wb") as f:
+            f.write(file.file.read())
+
+
+        # Read the PDF file
+        pdf_text, _ = get_pdf_data(file.filename)
+        pdfData = json.loads(pdfData)
+
+        pdfData["Pdf_Name"] = file.filename
+        pdfData["Approval"] = approval
+        pdfData["timestamp"] = datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+        print("Approval: " ,approval)
+          
+
+        print('Creating record..')
+
+        # Add the record to the database
+        db_manager.create_record(pdfData)
+
+        success_message = "Record created successfully!"
+
+        success_logger.info(f"Data saved successfully for file '{file.filename}'")
+        os.remove(file.filename)
+
+        return JSONResponse(content={"Message": success_message, "status_code": 200}, status_code=200)
+
+    except Exception as e:
+        # Log error
+        error_logger.error(f"Error in create_upload_file: {e} \n{traceback.format_exc()}")
+        return JSONResponse(content={"error": f"Internal Server Error: {e}"}, status_code=500)
+
+
+@app.post("/get_records/")
+async def get_records(data: Query_Dict):
+    try:
+        domain = " ".join(data.domain.strip().split())
+        organization_name = " ".join(data.organization_name.strip().split())
+        print(domain, organization_name)
+        response = db_manager.find_records(domain, organization_name)
+
+        if response is None:
+            return JSONResponse(content = {"Message": "No Users found for this organization. Please recheck the values for Entity Name and Domain Name.  and try again!", "status_code": 303})
+    
+        return JSONResponse(content = response, status_code = 200)
+    
+    except Exception as e:
+        # Log error
+        error_logger.error(f"Error in create_upload_file: {e} \n{traceback.format_exc()}")
+        return JSONResponse(content={"error": f"Internal Server Error: {e} "}, status_code=500)
+
+
+# Command to run: uvicorn server:app --port 8000 --reload
+
+
+
+import mysql.connector
+from mysql.connector import Error
+
+# class Manage_DB:
+#     def __init__(self):
+#         # Dictionary to map keys to data types
+#         self.data_type_mapping = {
+#             'Sender': 'VARCHAR(255)',
+#             'PAO_Code': 'VARCHAR(255)',
+#             'Entity_Name': 'VARCHAR(255)',
+#             'Ministry_Department': 'VARCHAR(255)',
+#             'Sender_Name': 'VARCHAR(255)',
+#             'Central_Govt_State_Govt': 'VARCHAR(255)',
+#             'Focal_point_with_official_designation': 'VARCHAR(255)',
+#             'Full_office_Address_wih_pin_code': 'VARCHAR(255)',
+#             'Full_address_of_Focal_point': 'VARCHAR(255)',
+#             'Phone_number_of_Focal_point': 'VARCHAR(255)',
+#             'Official_Email_Address': 'VARCHAR(255)',
+#             'Official_Website': 'VARCHAR(255)',
+#             'GSTIN': 'VARCHAR(255)',
+#             'Name_Designation': 'VARCHAR(255)',
+#             'Dept_Ministry': 'VARCHAR(255)',
+#             'E_mail': 'VARCHAR(255)',
+#             'Phone_No': 'VARCHAR(255)',
+#             'Date_': 'DATE',
+#             'Pdf_Data': 'LONGBLOB',
+#             'Pdf_Name': 'VARCHAR(255)',
+#             'Approval': 'VARCHAR(5)',
+#             'Domain_Name': 'VARCHAR(255)',  # Add data type for Domain_Name
+#             'Timestamp': 'DATETIME',       # Add data type for Timestamp
+#             'Usage_Flag': 'BOOLEAN'         # Assuming BOOLEAN; adjust if necessary
+#             # Add more mappings as needed
+#         }
+
+
+#         self.create_connection("localhost", "root", "abc@123456789", "pdf_database")
+#         self.create_table("pdf_records", pattern_dict_keys, "pdf_database")
+
+
+#     def create_connection(self, host_name, user_name, user_password, database):
+#         try:
+#             self.connection = mysql.connector.connect(
+#                 host=host_name,
+#                 user=user_name,
+#                 password=user_password,
+#                 database=database
+#             )
+#             self.cursor = self.connection.cursor()
+
+#         except Error as e:
+#             print(f"Error: {str(e)}")
+#             # If the database doesn't exist, create it
+#             if "1049" in str(e):  # MySQL error code for "unknown database"
+#                 print("Creating Database..")
+#                 self.connection = mysql.connector.connect(
+#                     host=host_name,
+#                     user=user_name,
+#                     password=user_password,
+#                 )
+#                 self.cursor = self.connection.cursor()
+#                 self.create_database(database)
+
+#     def create_database(self, db_name):
+#         query = f"CREATE DATABASE IF NOT EXISTS {db_name}"
+        
+#         try:
+#             self.execute_query(query)
+#             print(f"Database '{db_name}' created successfully!!")
+
+#         except (Exception, Error) as err:
+#             print(f"Error: '{err}'")
+
+#     def create_table(self, table_name, keys, database):
+#         self.execute_query(f"USE {database}")  # Switch to the specified database
+
+#         # Create a list of columns with appropriate data types based on the mapping
+#         columns = [f"{key.lower()} {self.data_type_mapping[key].lower()}" for key in keys]
+#         columns.extend(["pdf_data LONGBLOB", "pdf_name VARCHAR(255)", "timestamp DATETIME",
+#                         "usage_flag BOOLEAN" ])  # Add fields for storing PDF files and PDF names
+
+#         query = f'''
+#             CREATE TABLE IF NOT EXISTS {table_name} (
+#                 id INT AUTO_INCREMENT PRIMARY KEY,
+#                 {', '.join(columns)}
+#             )
+#         '''
+#         try:
+#             self.execute_query(query)
+#             print(f"Table '{table_name}' created successfully!!")
+
+#         except (Exception, Error) as err:
+#             print(f"Error: '{err}'")
+
+#     # def create_record(self, table_name, record_dict):
+        
+#     #     # columns = ', '.join([f"{key.lower()}" for key in record_dict.keys()])
+#     #     # placeholders = ', '.join(['%s'] * len(record_dict))
+#     #     # query = f"INSERT INTO {table_name} ({columns}) \nVALUES ({placeholders})"
+#     #     # dict_type = [type(z) for z in record_dict.values()]
+#     #     # try:
+#     #     #     record_values = list(record_dict.values())
+#     #     #     self.execute_query(query, tuple(record_values))
+            
+#     #     #     print("Record created successfully!")
+
+#     #     # except (Exception, Error) as err:
+#     #     #     print(f"Error: '{err}'")
+
+#     def create_record(self, table_name, record_dict):
+#         domain_name = record_dict['Domain_Name']
+#         # usage_flag = record_dict.get('usage_flag', False)
+#         record_dict['usage_flag'] = True
+#         # Check if there is an existing record with the same domain name and usage_flag = true
+#         existing_record_query = f"SELECT * FROM {table_name} WHERE domain_name = %s AND usage_flag = TRUE"
+#         existing_record_values = (domain_name,)
+
+#         try:
+#             self.cursor.execute(existing_record_query, existing_record_values)
+#             existing_record = self.cursor.fetchone()
+
+#             if existing_record:
+#                 # Update existing record's usage_flag to false
+#                 update_query = f"UPDATE {table_name} SET usage_flag = FALSE WHERE id = %s"
+#                 self.execute_query(update_query, (existing_record[0],))
+
+#         except (Exception, Error) as err:
+#             print(f"Error checking existing record: {err}")
+
+#         # Include current timestamp in the record_dict
+#         # record_dict['timestamp'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+#         # Insert the new record
+#         columns = ', '.join(record_dict.keys())
+#         placeholders = ', '.join(['%s'] * len(record_dict))
+#         insert_query = f"INSERT INTO {table_name} ({columns}) \nVALUES ({placeholders})"
+
+#         try:
+#             self.execute_query(insert_query, tuple(record_dict.values()))
+#             print("Record created successfully!")
+
+#         except (Exception, Error) as err:
+#             print(f"Error inserting record: {err}")
+
+#     def update_record(self, table_name, update_dict, condition_dict):
+#         set_clause = ', '.join([f"{key} = %s" for key in update_dict.keys()])
+#         condition_clause = ' AND '.join([f"{key} = %s" for key in condition_dict.keys()])
+#         query = f"UPDATE {table_name} SET {set_clause} WHERE {condition_clause}"
+
+#         try:
+#             values = list(update_dict.values()) + list(condition_dict.values())
+#             self.execute_query(query, tuple(values))
+#             print("Record updated successfully!")
+
+#         except (Exception, Error) as err:
+#             print(f"Error: '{err}'")
+
+#     def execute_query(self, query, values=None):
+#         try:
+#             self.cursor.execute(query, values)
+#             self.connection.commit()
+#             print("Query was successful")
+
+#         except (Exception, Error) as err:
+#             print(f"Error: '{err}'")
+
+# # Usage example:
+# pattern_dict_keys = [
+#     'Sender', 'PAO_Code', 'Entity_Name', 'Ministry_Department',
+#     'Sender_Name', 'Central_Govt_State_Govt', 'Focal_point_with_official_designation',
+#     'Full_office_Address_wih_pin_code', 'Full_address_of_Focal_point',
+#     'Phone_number_of_Focal_point', 'Official_Email_Address', 'Official_Website',
+#     'GSTIN', 'Name_Designation', 'Dept_Ministry', 'E_mail', 'Phone_No', 'Date_','Approval', 'Domain_Name'
+# ]
+
+# # if __name__ == '__main__':
+
+# #     db_manager = Manage_DB()
+# #     db_manager.create_connection("localhost", "root", "root", "")
+# #     db_manager.create_table("documents", pattern_dict_keys, "your_database_name")
+
+class Manage_DB:
+    def __init__(self):
+        # Dictionary to map keys to data types
+        self.data_type_mapping = {
+            "Sender": "VARCHAR(255)",
+            "PAO_Code": "VARCHAR(255)",
+            "Entity_Name": "VARCHAR(255)",
+            "Ministry_Department": "VARCHAR(255)",
+            "Sender_Name": "VARCHAR(255)",
+            "Central_Govt_State_Govt": "VARCHAR(255)",
+            "official_designation": "VARCHAR(255)",
+            "Full_office_Address_pin_code": "VARCHAR(255)",
+            "Full_address_of_Focal_point": "VARCHAR(255)",
+            "Phone_number_of_Focal_point": "VARCHAR(255)",
+            "Official_Email_Address": "VARCHAR(255)",
+            "Official_Website": "VARCHAR(255)",
+            "GSTIN": "VARCHAR(255)",
+            "Name_Designation": "VARCHAR(255)",
+            "Dept_Ministry": "VARCHAR(255)",
+            "E_mail": "VARCHAR(255)",
+            "Phone_No": "VARCHAR(255)",
+            "Signature_Date": "VARCHAR(20)",
+            "Pdf_Name": "VARCHAR(255)",
+            "Approval": "VARCHAR(5)",
+            "Domain_Name": "VARCHAR(255)",  # Add data type for Domain_Name
+            "Timestamp": "VARCHAR(50)",  # Add data type for Timestamp
+            "Usage_Flag": "CHAR",  # Assuming BOOLEAN; adjust if necessary
+            # Add more mappings as needed
+        }
+
+        
+        self.table_name = "pdf_database"
+
+        # self.create_connection("localhost", "root", "abc@123456789", "pdf_database")
+        # self.create_connection()
+
+        # self.create_table(list(self.data_type_mapping.keys()))
+
+        self.create_connection("localhost", "root", "abc@123456789", self.table_name)
+        # self.create_table(pattern_dict_keys)
+
+
+    def create_connection(self, host_name, user_name, user_password, database):
+        try:
+            self.connection = mysql.connector.connect(
+                host=host_name,
+                user=user_name,
+                password=user_password,
+                database=database
+            )
+            self.cursor = self.connection.cursor()
+
+        except Error as e:
+            print(f"Error: {str(e)}")
+            # If the database doesn't exist, create it
+            if "1049" in str(e):  # MySQL error code for "unknown database"
+                print("Creating Database..")
+                self.connection = mysql.connector.connect(
+                    host=host_name,
+                    user=user_name,
+                    password=user_password,
+                )
+                self.cursor = self.connection.cursor()
+                self.create_database(database)
+
+    def create_database(self, db_name):
+        query = f"CREATE DATABASE IF NOT EXISTS {db_name}"
+        
+        try:
+            self.execute_query(query)
+            print(f"Database '{db_name}' created successfully!!")
+
+        except (Exception, Error) as err:
+            print(f"Error: '{err}'")
+            error_msg = f"Error executing query: {str(err)}"
+            raise Exception(f"Error checking existing record: {err}")
+
+    def create_table(self, keys):
+        # self.execute_query(f"USE {database}")  # Switch to the specified database
+        # self.execute_query(f"DROP TABLE {self.table_name}")
+
+        # Create a list of columns with appropriate data types based on the mapping
+        columns = [
+            f"{key.lower()} {self.data_type_mapping[key].lower()}" for key in keys
+        ]
+        # columns.extend(["pdf_data long", "pdf_name varchar(255)", "timestamp datetime",
+        #                 "usage_flag boolean" ])  # Add fields for storing PDF files and PDF names
+
+        query = f"""
+            CREATE TABLE {self.table_name} (
+                id INT PRIMARY KEY,
+                {', '.join(columns)}
+        )
+        """
+        print("Query Initialized")
+        try:
+            self.execute_query(query)
+            print(f"Table '{self.table_name}' created successfully!!")
+
+        except Exception as err:
+            print(f"Error in create_table: '{err}'")
+            error_msg = f"Error executing query: {str(err)}"
+            raise Exception(f"Error checking existing record: {err}")
+
+
+    # def create_record(self, table_name, record_dict):
+
+    #     # columns = ', '.join([f"{key.lower()}" for key in record_dict.keys()])
+    #     # placeholders = ', '.join(['%s'] * len(record_dict))
+    #     # query = f"INSERT INTO {table_name} ({columns}) \nVALUES ({placeholders})"
+    #     # dict_type = [type(z) for z in record_dict.values()]
+    #     # try:
+    #     #     record_values = list(record_dict.values())
+    #     #     self.execute_query(query, tuple(record_values))
+
+    #     #     print("Record created successfully!")
+
+    #     # except (Exception, Error) as err:
+    #     #     print(f"Error: '{err}'")
+
+    def create_record(self, record_dict):
+        domain_name = record_dict["Domain_Name"].replace(" ", "")
+        # usage_flag = record_dict.get('usage_flag', 0)
+        record_dict["usage_flag"] = "t"
+        # Check if there is an existing record with the same domain name and usage_flag = 1
+        existing_record_query = f"SELECT * FROM {self.table_name} WHERE domain_name = :domain_name AND usage_flag = :usage_flag"
+        # print("Records dict: ", record_dict)
+        # print("Domain name: ", domain_name, "asd")
+
+        existing_record_values = {
+            "domain_name": domain_name,
+            "usage_flag": record_dict["usage_flag"],
+        }
+
+        try:
+            print("Existing record query: ", existing_record_query)
+            self.cursor.execute(existing_record_query, existing_record_values)
+            print("Existing record query executed..")
+            existing_record = self.cursor.fetchone()
+
+            if existing_record:
+                # Update existing record's usage_flag to 0
+                usage_f = "f"
+                print("Updating existing record..")
+                update_query = (
+                    f"UPDATE {self.table_name} SET usage_flag = :usage_f WHERE id = :id"
+                )
+                updating_record_creds = {"usage_f": usage_f, "id": existing_record[0]}
+                self.execute_query(update_query, updating_record_creds)
+
+            # Insert the new record
+
+            print("Inserting record...")
+
+            count_que = self.cursor.execute(f"SELECT * from {self.table_name}")
+            print("Count que: ", count_que)
+            id = len(count_que.fetchall()) + 1
+            print("id: ", id)
+            record_items_ls = list(record_dict.items())
+            record_items_ls.insert(0, ("id", id))
+            record_dict = dict(record_items_ls)
+            # print(record_dict.keys())
+
+            columns = ",".join(y.lower() for y in record_dict.keys())
+
+            # placeholders = ','.join(['%s'] * len(record_dict))
+
+            placeholders = (", ").join([":" + x for x in record_dict.keys()])
+            insert_query = (
+                f"INSERT INTO {self.table_name} ({columns}) VALUES({placeholders})"
+            )
+
+            # print(insert_query)
+            # print("Record values: ", record_dict)
+
+            try:
+                self.execute_query(insert_query, list(record_dict.values()))
+                print("Record created successfully!")
+
+            except Exception as err:
+                print(f"Error inserting record: {err}")
+                error_msg = f"Error executing query: {str(err)}"
+                raise Exception(f"Error checking existing record: {err}")
+
+
+        except Exception as err:
+            print(f"Error checking existing record: {err}")
+            error_msg = f"Error executing query: {str(err)}"
+            raise Exception(f"Error checking existing record: {err}")
+
+
+        # Include current timestamp in the record_dict
+        # record_dict['timestamp'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    def update_record(self, update_dict, condition_dict):
+        set_clause = ", ".join([f"{key} = %s" for key in update_dict.keys()])
+        condition_clause = " AND ".join(
+            [f"{key} = %s" for key in condition_dict.keys()]
+        )
+        query = f"UPDATE {self.table_name} SET {set_clause} WHERE {condition_clause}"
+
+        try:
+            values = list(update_dict.values()) + list(condition_dict.values())
+            self.execute_query(query, tuple(values))
+            print("Record updated successfully!")
+
+        except Exception as err:
+            print(f"Error in update_record: '{err}'")
+            error_msg = f"Error executing query: {str(err)}"
+            raise Exception(f"Error checking existing record: {err}")
+
+
+    def execute_query(self, query, values=None):
+        try:
+            self.cursor.execute(query, values)
+            self.connection.commit()
+
+        except Exception as err:
+            print(f"Error in query_execution: '{err}'")
+            error_msg = f"Error executing query: {str(err)}"
+            # raise Exception(f"Error checking existing record: {err}")
+
+
+    def find_records(self, domain, organization):
+        # res = self.cursor.execute(
+        #     "SELECT DISTINCT USER_ID, USER_NAME, COMPANY, COMPANY_ID FROM USER_ADDRESS WHERE E_MAIL LIKE '%"
+        #     + domain
+        #     + "' AND INSTR('"
+        #     + organization.upper()
+        #     + "',UPPER(COMPANY))>0"
+        # )
+        try:
+            res_ls = [] #res.fetchall()
+            if len(res_ls) == 0:
+                return {
+                    "No Users Found": ["No Users found for this organization. Please recheck the values for Entity Name and Domain Name.  and try again!"]
+                }
+            else:
+                ID, USER_ID, USER_NAME, COMPANY, COMPANY_ID = (
+                    [id for id in range(1, len(res_ls)+1)],
+                    [user_id[0] for user_id in res_ls],
+                    [user_name[1] for user_name in res_ls],
+                    [company[2] for company in res_ls],
+                    [company_id[3] for company_id in res_ls],
+                )
+                res_dict = {
+                    "S. No.": ID,
+                    "USER_ID": USER_ID,
+                    "USER_NAME": USER_NAME,
+                    "COMPANY": COMPANY,
+                    "COMPANY_ID": COMPANY_ID
+                }
+                return res_dict
+        except Exception as err:
+            print(f"Error in query_execution: '{err}'")
+            error_msg = f"Error executing query: {str(err)}"
+            raise Exception(f"Error checking existing record: {err}")    
+
+
+# Usage example:
+pattern_dict_keys = [
+    "Sender",
+    "PAO_Code",
+    "Entity_Name",
+    "Ministry_Department",
+    "Sender_Name",
+    "Central_Govt_State_Govt",
+    "official_designation",
+    "Full_office_Address_pin_code",
+    "Full_address_of_Focal_point",
+    "Phone_number_of_Focal_point",
+    "Official_Email_Address",
+    "Official_Website",
+    "GSTIN",
+    "Name_Designation",
+    "E_mail",
+    "Phone_No",
+    "Signature_Date",
+    "Approval",
+    "Domain_Name",
+]
+
+# if __name__ == '__main__':
+
+#     db_manager = Manage_DB()
+#     db_manager.create_connection()
+#     # db_manager.create_table("documents", pattern_dict_keys, "your_database_name")
+
+
+// service.js
+import axios from 'axios';
+
+const BASE_URL = 'http://localhost:8000'; // Update with your FastAPI backend URL
+
+export const uploadFile = async (file) => {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await axios.post(`${BASE_URL}/uploadfile/`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    console.log(response.data)
+    return response.data;
+  } catch (error) {
+    console.log(error);
+    alert(error.response.data.error);
+
+  }
+};
+
+export const addRecord = async (file, approval, pdfData) => {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('approval', approval);
+    formData.append('pdfData', JSON.stringify(pdfData)); // Send PDF data as JSON string
+    const response = await axios.post(`${BASE_URL}/add_record/`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    return response.data;
+  } catch (error) {
+    console.log(error);
+    alert(error.response.data.error);
+  }
+};
+
+export const getQueryTable = async (pdfData) => {
+  try {
+    const json_data = {
+      'domain': pdfData.Domain_Name,
+      'organization_name': pdfData.Entity_Name
+    }
+
+    
+    const response = await axios.post(
+      `${BASE_URL}/get_records/`, json_data, {
+        headers: {
+          'Content-Type': 'application/json'
+        },
+      }
+    );
+    // console.log(response)
+    return response.data
+  } catch (error){
+    console.log(error);
+    alert(error.response.data.error);
+  }
+}
+
+
+/* styles.css */
+
+.table {
+  display: flex;
+  justify-content: center;
+}
+
+.body {
+  background-color: #a39f9f;
+}
+
+.button {
+  font-size: 20px;
+  background-color: black;
+  color: whitesmoke;
+}
+
+.button:hover {
+  transition: all;
+  background-color: darkolivegreen;
+}
+
+.pdf-table-container {
+  overflow-x: auto;
+  width: 100%;
+}
+
+.pdf-table {
+  border-collapse: collapse;
+  width: 100%;
+  background-color: rgb(235, 231, 231);
+}
+
+.pdf-table th,
+.pdf-table td {
+  border: 1px solid #ddd;
+  padding: 12px;
+  text-align: left;
+  white-space: nowrap;
+  max-width: 90%;
+  overflow-x: auto;
+}
+
+.table-value {
+  max-width: 80%; /* Set a maximum height for the scrollable area */
+  overflow-x: auto;
+}
+
+.table-value td::-webkit-scrollbar {
+  width: 12px; /* Set the width of the scrollbar */
+}
+
+.table-value td::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2); /* Set the color of the scrollbar thumb */
+  border-radius: 6px; /* Set the border radius of the thumb */
+}
+
+.pdf-table th {
+  background-color: black;
+  color: white;
+}
+
+.pdf-key {
+  font-weight: bold;
+  width: 300px;
+}
+
+.table-value tr:hover {
+  background-color: #f5f5f5;
+  transition: background-color 0.3s ease;
+}
+
+.table-value th:hover {
+  background-color: #3f3e3e;
+  transition: background-color 0.3s ease;
+}
+
+.approveDiv {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: all;
+  transition-duration: 500ms;
+}
+
+.approve {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 20px;
+  padding: 10px;
+  width: 200px;
+  height: 50px;
+  background: rgb(104, 102, 102);
+  color: white;
+}
+
